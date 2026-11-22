@@ -1,0 +1,6 @@
+{
+  "name": "New Life Medical Store Kalimpong",
+  "description": "Full-stack healthcare platform, pathology lab directory, doctor consultation showcase, and appointment management system for New Life Medical Store Kalimpong.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

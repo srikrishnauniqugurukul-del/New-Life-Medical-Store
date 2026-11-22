@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  --color-medical-green: #168B4B;
+  --color-medical-green-dark: #11713C;
+  --color-healthcare-red: #E34C3D;
+  --color-healthcare-red-dark: #C93B2D;
+  --color-charcoal: #26352E;
+  --color-slate-muted: #52645B;
+  --color-light-mint: #F2F9F4;
+  --color-light-red: #FFF2F0;
+  --color-hairline: #DDECE3;
+  --font-display: "Manrope", "DM Sans", sans-serif;
+  --font-sans: "DM Sans", "Manrope", sans-serif;
+  --font-bengali: "Hind Siliguri", "Manrope", sans-serif;
+  --font-nepali: "Noto Sans Devanagari", "Manrope", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: #26352E;
+    background-color: #FFFFFF;
+    scroll-behavior: smooth;
+  }
+
+  html[lang="bn"] {
+    font-family: var(--font-bengali);
+  }
+
+  html[lang="ne"] {
+    font-family: var(--font-nepali);
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+
+  html[lang="bn"] h1,
+  html[lang="bn"] h2,
+  html[lang="bn"] h3,
+  html[lang="bn"] h4 {
+    font-family: var(--font-bengali);
+  }
+
+  html[lang="ne"] h1,
+  html[lang="ne"] h2,
+  html[lang="ne"] h3,
+  html[lang="ne"] h4 {
+    font-family: var(--font-nepali);
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Smooth focus rings for WCAG AA keyboard accessibility */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #168B4B;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
