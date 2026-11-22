@@ -102,11 +102,13 @@ export function Footer() {
               <li className="pt-2">
                 <button
                   type="button"
-                  onClick={() => navigate('/admin')}
+                  onClick={() => navigate('/admin/login')}
                   className="inline-flex items-center gap-1.5 text-xs font-medium text-[#86EFAC] hover:text-white transition-colors"
                 >
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  {t('footerAdmin')}
+                  {publicData?.health && !publicData.health.adminInitialized
+                    ? 'Admin Sign Up / Login'
+                    : 'Admin Login'}
                 </button>
               </li>
             </ul>

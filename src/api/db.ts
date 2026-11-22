@@ -145,6 +145,25 @@ export function getBackendHealth(): BackendHealthStatus {
   };
 }
 
+export async function getBackendHealthAsync(): Promise<BackendHealthStatus> {
+  const base = getBackendHealth();
+  const sbAdmin = getSupabaseAdmin();
+  if (sbAdmin) {
+    const { count, error } = await sbAdmin
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'admin')
+      .eq('is_active', true);
+    if (!error) {
+      return {
+        ...base,
+        adminInitialized: (count ?? 0) > 0,
+      };
+    }
+  }
+  return base;
+}
+
 // ============================================================================
 // CRYPTO & SESSION HELPERS (Local preview admin claim / Bearer token verification)
 // ============================================================================
@@ -208,20 +227,91 @@ export function verifyLocalToken(token: string): AdminProfile | null {
 }
 
 export async function claimLocalAdmin(email: string, fullName: string, password: string): Promise<{ token: string; profile: AdminProfile }> {
-  if (isSupabaseConfigured()) {
-    throw new Error('Supabase Auth is active. Create admin users inside your Supabase project.');
+  const normalizedEmail = email.trim().toLowerCase();
+  const cleanName = fullName.trim();
+
+  const sbAdmin = getSupabaseAdmin();
+  const sbPublic = getSupabasePublic();
+  if (sbAdmin && sbPublic) {
+    // Strictly enforce 1-of-1 Single Admin Slot in Supabase PostgreSQL
+    const { count, error: countErr } = await sbAdmin
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'admin');
+    if (countErr) {
+      throw new Error(countErr.message);
+    }
+    if ((count ?? 0) > 0) {
+      const err = new Error(
+        'The single administrator slot has already been claimed. Nobody else can create an admin account.'
+      );
+      (err as any).statusCode = 403;
+      throw err;
+    }
+
+    const { data: created, error: createErr } = await sbAdmin.auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: cleanName },
+    });
+    if (createErr || !created.user) {
+      throw new Error(createErr?.message || 'Unable to create administrator account.');
+    }
+
+    const { error: profErr } = await sbAdmin.from('profiles').insert({
+      id: created.user.id,
+      email: normalizedEmail,
+      full_name: cleanName,
+      role: 'admin',
+      is_active: true,
+    });
+    if (profErr) {
+      // Clean up auth user if unique single-admin constraint rejected a concurrent race
+      await sbAdmin.auth.admin.deleteUser(created.user.id).catch(() => {});
+      const err = new Error(
+        'The single administrator slot has already been claimed. Nobody else can create an admin account.'
+      );
+      (err as any).statusCode = 403;
+      throw err;
+    }
+
+    const { data: sessionData, error: loginErr } = await sbPublic.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+    if (loginErr || !sessionData.session) {
+      throw new Error(loginErr?.message || 'Admin created, please sign in with your credentials.');
+    }
+
+    return {
+      token: sessionData.session.access_token,
+      profile: {
+        id: created.user.id,
+        email: normalizedEmail,
+        full_name: cleanName,
+        role: 'admin',
+      },
+    };
   }
+
   if (process.env.ADMIN_PASSCODE && process.env.ADMIN_PASSCODE.length >= 6) {
-    throw new Error('Admin passcode is already configured via server environment.');
+    const err = new Error('Administrator account is already locked via server environment.');
+    (err as any).statusCode = 403;
+    throw err;
   }
   if (previewStore.localAdmin) {
-    throw new Error('Administrator account has already been initialized. Please sign in.');
+    const err = new Error(
+      'The single administrator slot has already been claimed. Nobody else can create an admin account.'
+    );
+    (err as any).statusCode = 403;
+    throw err;
   }
   const { salt, hash } = hashPasswordScrypt(password);
   const account: LocalAdminAccount = {
     id: crypto.randomUUID(),
-    email: email.trim().toLowerCase(),
-    full_name: fullName.trim(),
+    email: normalizedEmail,
+    full_name: cleanName,
     role: 'admin',
     passwordSalt: salt,
     passwordHash: hash,

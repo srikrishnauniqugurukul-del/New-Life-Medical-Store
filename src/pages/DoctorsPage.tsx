@@ -130,13 +130,6 @@ export function DoctorsPage() {
               <Phone className="w-4 h-4" />
               {t('ctaCallNow')}
             </a>
-            <button
-              type="button"
-              onClick={() => navigate('/admin')}
-              className="px-4 py-2.5 rounded-xl bg-white border border-[#CBE0D3] text-[#26352E] hover:bg-[#F2F9F4] text-xs font-semibold"
-            >
-              Clinic Owner? Verify &amp; Publish Doctors in Admin →
-            </button>
           </div>
         </div>
       ) : (

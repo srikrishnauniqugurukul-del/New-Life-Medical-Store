@@ -13,6 +13,7 @@ import {
   deleteGalleryItem,
   deleteService,
   getBackendHealth,
+  getBackendHealthAsync,
   getDatabaseInspectorSnapshot,
   getSiteSettings,
   listAppointmentsEnriched,
@@ -97,8 +98,9 @@ export function createApiRouter() {
 
   router.get('/public/bootstrap', async (_req, res) => {
     try {
-      const [settings, departments, services, doctors, businessHours, blockedDates, gallery] =
+      const [health, settings, departments, services, doctors, businessHours, blockedDates, gallery] =
         await Promise.all([
+          getBackendHealthAsync(),
           getSiteSettings(),
           listDepartments(true),
           listServices(true),
@@ -109,7 +111,7 @@ export function createApiRouter() {
         ]);
 
       res.json({
-        health: getBackendHealth(),
+        health,
         settings,
         departments,
         services,
@@ -260,7 +262,7 @@ export function createApiRouter() {
   // ==========================================================================
 
   router.get('/auth/status', async (req, res) => {
-    const health = getBackendHealth();
+    const health = await getBackendHealthAsync();
     const token = extractBearer(req);
     const profile = token ? await verifyAdminBearerToken(token) : null;
     res.json({
@@ -289,7 +291,8 @@ export function createApiRouter() {
       );
       res.status(201).json(result);
     } catch (err: any) {
-      res.status(400).json({ error: err?.message || 'Unable to initialize administrator.' });
+      const status = err?.statusCode === 403 ? 403 : 400;
+      res.status(status).json({ error: err?.message || 'Unable to initialize administrator.' });
     }
   });
 

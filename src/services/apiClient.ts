@@ -17,6 +17,7 @@ import type {
   TimeSlotOption,
 } from '../lib/types';
 import { staticApiFallback } from './staticApiFallback';
+import { isBrowserSupabaseReady, supabaseBrowserApi } from './supabaseBrowserApi';
 
 class StaticHostFallbackSignal extends Error {
   constructor(message: string) {
@@ -82,8 +83,12 @@ async function apiFetch<T>(
 
 async function withFallback<T>(
   remoteCall: () => Promise<T>,
-  fallbackCall: () => Promise<T>
+  fallbackCall: () => Promise<T>,
+  supabaseBrowserCall?: () => Promise<T>
 ): Promise<T> {
+  if (supabaseBrowserCall && isBrowserSupabaseReady()) {
+    return supabaseBrowserCall();
+  }
   try {
     return await remoteCall();
   } catch (err) {
@@ -98,7 +103,8 @@ export const api = {
   getPublicBootstrap: () =>
     withFallback(
       () => apiFetch<PublicSitePayload>('/api/public/bootstrap'),
-      () => staticApiFallback.getPublicBootstrap()
+      () => staticApiFallback.getPublicBootstrap(),
+      () => supabaseBrowserApi.getPublicBootstrap()
     ),
 
   getAvailableSlots: (params: {
@@ -122,7 +128,8 @@ export const api = {
           blockReason?: string;
           slots: TimeSlotOption[];
         }>(`/api/public/slots?${q.toString()}`),
-      () => staticApiFallback.getAvailableSlots(params)
+      () => staticApiFallback.getAvailableSlots(params),
+      () => supabaseBrowserApi.getAvailableSlots(params)
     );
   },
 
@@ -153,7 +160,8 @@ export const api = {
           notificationChannels: { in_app: string; email: string; whatsapp: string; sms: string };
           backendMode: 'supabase' | 'local_preview';
         }>('/api/bookings', { method: 'POST', body: JSON.stringify(payload) }),
-      () => staticApiFallback.submitBooking(payload)
+      () => staticApiFallback.submitBooking(payload),
+      () => supabaseBrowserApi.submitBooking(payload)
     ),
 
   lookupBooking: (booking_reference: string, mobile_number: string) =>
@@ -172,7 +180,8 @@ export const api = {
           method: 'POST',
           body: JSON.stringify({ booking_reference, mobile_number }),
         }),
-      () => staticApiFallback.lookupBooking(booking_reference, mobile_number)
+      () => staticApiFallback.lookupBooking(booking_reference, mobile_number),
+      () => supabaseBrowserApi.lookupBooking(booking_reference, mobile_number)
     ),
 
   submitEnquiry: (payload: {
@@ -187,7 +196,8 @@ export const api = {
           method: 'POST',
           body: JSON.stringify(payload),
         }),
-      () => staticApiFallback.submitEnquiry(payload)
+      () => staticApiFallback.submitEnquiry(payload),
+      () => supabaseBrowserApi.submitEnquiry(payload)
     ),
 
   // Auth
@@ -199,7 +209,8 @@ export const api = {
           profile: AdminProfile | null;
           health: BackendHealthStatus;
         }>('/api/auth/status', {}, token),
-      () => staticApiFallback.getAuthStatus(token)
+      () => staticApiFallback.getAuthStatus(token),
+      () => supabaseBrowserApi.getAuthStatus(token)
     ),
 
   claimAdmin: (payload: { email: string; full_name: string; password: string }) =>
@@ -209,7 +220,8 @@ export const api = {
           method: 'POST',
           body: JSON.stringify(payload),
         }),
-      () => staticApiFallback.claimAdmin(payload)
+      () => staticApiFallback.claimAdmin(payload),
+      () => supabaseBrowserApi.claimAdmin(payload)
     ),
 
   loginAdmin: (payload: { email: string; password: string }) =>
@@ -219,7 +231,8 @@ export const api = {
           method: 'POST',
           body: JSON.stringify(payload),
         }),
-      () => staticApiFallback.loginAdmin(payload)
+      () => staticApiFallback.loginAdmin(payload),
+      () => supabaseBrowserApi.loginAdmin(payload)
     ),
 
   resetAdminPassword: (email: string) =>
@@ -229,7 +242,8 @@ export const api = {
           method: 'POST',
           body: JSON.stringify({ email }),
         }),
-      () => staticApiFallback.resetAdminPassword(email)
+      () => staticApiFallback.resetAdminPassword(email),
+      () => supabaseBrowserApi.resetAdminPassword(email)
     ),
 
   // Protected Admin Endpoints
@@ -249,7 +263,8 @@ export const api = {
           notifications: NotificationLog[];
           settings: SiteContentSettings;
         }>('/api/admin/dashboard', {}, token),
-      () => staticApiFallback.getAdminDashboard(token)
+      () => staticApiFallback.getAdminDashboard(token),
+      () => supabaseBrowserApi.getAdminDashboard(token)
     ),
 
   updateAppointment: (
@@ -264,7 +279,8 @@ export const api = {
           { method: 'PATCH', body: JSON.stringify(patch) },
           token
         ),
-      () => staticApiFallback.updateAppointment(token, id, patch)
+      () => staticApiFallback.updateAppointment(token, id, patch),
+      () => supabaseBrowserApi.updateAppointment(token, id, patch)
     ),
 
   createService: (token: string, payload: Omit<ServiceItem, 'id'>) =>
@@ -275,7 +291,8 @@ export const api = {
           { method: 'POST', body: JSON.stringify(payload) },
           token
         ),
-      () => staticApiFallback.createService(token, payload)
+      () => staticApiFallback.createService(token, payload),
+      () => supabaseBrowserApi.createService(token, payload)
     ),
 
   updateService: (token: string, id: string, patch: Partial<ServiceItem>) =>
@@ -286,13 +303,15 @@ export const api = {
           { method: 'PATCH', body: JSON.stringify(patch) },
           token
         ),
-      () => staticApiFallback.updateService(token, id, patch)
+      () => staticApiFallback.updateService(token, id, patch),
+      () => supabaseBrowserApi.updateService(token, id, patch)
     ),
 
   deleteService: (token: string, id: string) =>
     withFallback(
       () => apiFetch<{ ok: boolean }>(`/api/admin/services/${id}`, { method: 'DELETE' }, token),
-      () => staticApiFallback.deleteService(token, id)
+      () => staticApiFallback.deleteService(token, id),
+      () => supabaseBrowserApi.deleteService(token, id)
     ),
 
   createDoctor: (token: string, payload: Omit<Doctor, 'id'>) =>
@@ -303,7 +322,8 @@ export const api = {
           { method: 'POST', body: JSON.stringify(payload) },
           token
         ),
-      () => staticApiFallback.createDoctor(token, payload)
+      () => staticApiFallback.createDoctor(token, payload),
+      () => supabaseBrowserApi.createDoctor(token, payload)
     ),
 
   updateDoctor: (token: string, id: string, patch: Partial<Doctor>) =>
@@ -314,13 +334,15 @@ export const api = {
           { method: 'PATCH', body: JSON.stringify(patch) },
           token
         ),
-      () => staticApiFallback.updateDoctor(token, id, patch)
+      () => staticApiFallback.updateDoctor(token, id, patch),
+      () => supabaseBrowserApi.updateDoctor(token, id, patch)
     ),
 
   deleteDoctor: (token: string, id: string) =>
     withFallback(
       () => apiFetch<{ ok: boolean }>(`/api/admin/doctors/${id}`, { method: 'DELETE' }, token),
-      () => staticApiFallback.deleteDoctor(token, id)
+      () => staticApiFallback.deleteDoctor(token, id),
+      () => supabaseBrowserApi.deleteDoctor(token, id)
     ),
 
   saveBusinessHours: (token: string, hours: BusinessHour[]) =>
@@ -331,7 +353,8 @@ export const api = {
           { method: 'PUT', body: JSON.stringify(hours) },
           token
         ),
-      () => staticApiFallback.saveBusinessHours(token, hours)
+      () => staticApiFallback.saveBusinessHours(token, hours),
+      () => supabaseBrowserApi.saveBusinessHours(token, hours)
     ),
 
   createBlockedDate: (token: string, payload: Omit<BlockedDate, 'id'>) =>
@@ -342,7 +365,8 @@ export const api = {
           { method: 'POST', body: JSON.stringify(payload) },
           token
         ),
-      () => staticApiFallback.createBlockedDate(token, payload)
+      () => staticApiFallback.createBlockedDate(token, payload),
+      () => supabaseBrowserApi.createBlockedDate(token, payload)
     ),
 
   updateBlockedDate: (token: string, id: string, patch: Partial<BlockedDate>) =>
@@ -353,14 +377,16 @@ export const api = {
           { method: 'PATCH', body: JSON.stringify(patch) },
           token
         ),
-      () => staticApiFallback.updateBlockedDate(token, id, patch)
+      () => staticApiFallback.updateBlockedDate(token, id, patch),
+      () => supabaseBrowserApi.updateBlockedDate(token, id, patch)
     ),
 
   deleteBlockedDate: (token: string, id: string) =>
     withFallback(
       () =>
         apiFetch<{ ok: boolean }>(`/api/admin/blocked-dates/${id}`, { method: 'DELETE' }, token),
-      () => staticApiFallback.deleteBlockedDate(token, id)
+      () => staticApiFallback.deleteBlockedDate(token, id),
+      () => supabaseBrowserApi.deleteBlockedDate(token, id)
     ),
 
   createGalleryItem: (token: string, payload: Omit<GalleryItem, 'id'>) =>
@@ -371,7 +397,8 @@ export const api = {
           { method: 'POST', body: JSON.stringify(payload) },
           token
         ),
-      () => staticApiFallback.createGalleryItem(token, payload)
+      () => staticApiFallback.createGalleryItem(token, payload),
+      () => supabaseBrowserApi.createGalleryItem(token, payload)
     ),
 
   updateGalleryItem: (token: string, id: string, patch: Partial<GalleryItem>) =>
@@ -382,13 +409,15 @@ export const api = {
           { method: 'PATCH', body: JSON.stringify(patch) },
           token
         ),
-      () => staticApiFallback.updateGalleryItem(token, id, patch)
+      () => staticApiFallback.updateGalleryItem(token, id, patch),
+      () => supabaseBrowserApi.updateGalleryItem(token, id, patch)
     ),
 
   deleteGalleryItem: (token: string, id: string) =>
     withFallback(
       () => apiFetch<{ ok: boolean }>(`/api/admin/gallery/${id}`, { method: 'DELETE' }, token),
-      () => staticApiFallback.deleteGalleryItem(token, id)
+      () => staticApiFallback.deleteGalleryItem(token, id),
+      () => supabaseBrowserApi.deleteGalleryItem(token, id)
     ),
 
   uploadGalleryImage: (
@@ -406,7 +435,8 @@ export const api = {
           { method: 'POST', body: JSON.stringify(payload) },
           token
         ),
-      () => staticApiFallback.uploadGalleryImage(token, payload)
+      () => staticApiFallback.uploadGalleryImage(token, payload),
+      () => supabaseBrowserApi.uploadGalleryImage(token, payload)
     ),
 
   saveSiteSettings: (token: string, settings: SiteContentSettings) =>
@@ -417,14 +447,16 @@ export const api = {
           { method: 'PUT', body: JSON.stringify(settings) },
           token
         ),
-      () => staticApiFallback.saveSiteSettings(token, settings)
+      () => staticApiFallback.saveSiteSettings(token, settings),
+      () => supabaseBrowserApi.saveSiteSettings(token, settings)
     ),
 
   markNotificationRead: (token: string, id: string) =>
     withFallback(
       () =>
         apiFetch<{ ok: boolean }>(`/api/admin/notifications/${id}/read`, { method: 'PATCH' }, token),
-      () => staticApiFallback.markNotificationRead(token, id)
+      () => staticApiFallback.markNotificationRead(token, id),
+      () => supabaseBrowserApi.markNotificationRead(token, id)
     ),
 
   getDatabaseInspector: (token: string) =>
@@ -434,7 +466,8 @@ export const api = {
           mode: 'supabase' | 'local_preview';
           tables: Array<{ name: string; count: number; sample: any[] }>;
         }>('/api/admin/database', {}, token),
-      () => staticApiFallback.getDatabaseInspector(token)
+      () => staticApiFallback.getDatabaseInspector(token),
+      () => supabaseBrowserApi.getDatabaseInspector(token)
     ),
 
   seedSupabaseCatalog: (token: string) =>
@@ -445,7 +478,8 @@ export const api = {
           { method: 'POST' },
           token
         ),
-      () => staticApiFallback.seedSupabaseCatalog(token)
+      () => staticApiFallback.seedSupabaseCatalog(token),
+      () => supabaseBrowserApi.seedSupabaseCatalog(token)
     ),
 
   updateAdminProfile: (
@@ -459,6 +493,7 @@ export const api = {
           { method: 'PATCH', body: JSON.stringify(payload) },
           token
         ),
-      () => staticApiFallback.updateAdminProfile(token, payload)
+      () => staticApiFallback.updateAdminProfile(token, payload),
+      () => supabaseBrowserApi.updateAdminProfile(token, payload)
     ),
 };

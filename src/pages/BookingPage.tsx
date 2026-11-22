@@ -32,6 +32,7 @@ export function BookingPage() {
   const [serviceId, setServiceId] = useState<string>('');
   const [doctorId, setDoctorId] = useState<string>(''); // '' means Clinic-Assigned Specialist / N/A
   const [selectedDate, setSelectedDate] = useState<string>(() => getTodayIST());
+  const [userPickedDate, setUserPickedDate] = useState<boolean>(false);
   const [selectedTime, setSelectedTime] = useState<string>('');
 
   // Dynamic slot state fetched from server
@@ -138,13 +139,13 @@ export function BookingPage() {
   );
 
   const upcomingDates = useMemo(() => getUpcomingDatesIST(28), []);
+  const isDateSlotStep = step === 4 || step === 5;
 
-  // Fetch live server-side available slots whenever date/category/service/doctor changes on step >= 4
+  // Fetch live available slots ONLY while on Step 4/5 (never wipe selectedTime when moving to Steps 6-7!)
   useEffect(() => {
-    if (step < 4 || !selectedDate) return;
+    if (!isDateSlotStep || !selectedDate) return;
     let cancelled = false;
     setLoadingSlots(true);
-    setSelectedTime('');
     api
       .getAvailableSlots({
         category,
@@ -154,9 +155,24 @@ export function BookingPage() {
       })
       .then((res) => {
         if (cancelled) return;
+        const hasOpenSlot = !res.isBlocked && res.slots.some((s) => s.available);
+
+        // If user hasn't manually picked a date yet and today is closed/past clinic hours,
+        // automatically jump to the next upcoming date (up to 7 days ahead) so slots appear immediately.
+        if (!userPickedDate && !hasOpenSlot) {
+          const currentIdx = upcomingDates.indexOf(selectedDate);
+          if (currentIdx >= 0 && currentIdx < 7 && currentIdx + 1 < upcomingDates.length) {
+            setSelectedDate(upcomingDates[currentIdx + 1]);
+            return;
+          }
+        }
+
         setSlots(res.slots);
         setDateBlocked(res.isBlocked);
         setDateBlockReason(res.blockReason || '');
+        setSelectedTime((prev) =>
+          res.slots.some((s) => s.time === prev && s.available) ? prev : ''
+        );
       })
       .catch(() => {
         if (cancelled) return;
@@ -170,7 +186,7 @@ export function BookingPage() {
     return () => {
       cancelled = true;
     };
-  }, [step, category, serviceId, doctorId, selectedDate]);
+  }, [isDateSlotStep, category, serviceId, doctorId, selectedDate, userPickedDate, upcomingDates]);
 
   const isDateMarkedBlocked = (dateStr: string) =>
     blockedDates.some(
@@ -604,7 +620,9 @@ export function BookingPage() {
                       type="button"
                       disabled={blocked}
                       onClick={() => {
+                        setUserPickedDate(true);
                         setSelectedDate(dateStr);
+                        setSelectedTime('');
                         setStep(5);
                       }}
                       className={`p-2.5 rounded-xl border text-center transition-colors min-h-[64px] flex flex-col items-center justify-center ${
